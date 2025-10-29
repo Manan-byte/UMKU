@@ -1,0 +1,1175 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manajemen Data Google Sheet</title>
+    <!-- Memuat Google Font Lexend Deca --><link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Lexend+Deca:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Memuat Tailwind CSS --><script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Menggunakan font Lexend Deca */
+        body {
+            font-family: 'Lexend Deca', sans-serif;
+        }
+
+        /* [BARU] Variabel Tema CSS untuk ganti warna dinamis */
+        :root {
+            --theme-600: #2563eb; /* default: blue-600 */
+            --theme-700: #1d4ed8; /* default: blue-700 */
+            --theme-800: #1e40af; /* default: blue-800 */
+            --theme-focus-ring: #3b82f680; /* default: blue-500/50 */
+        }
+
+        /* Style untuk scrollbar yang lebih halus */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        /* Style untuk link navigasi dibuat seperti Tab/Pill */
+        .nav-link {
+            cursor: pointer;
+            padding: 8px 16px;
+            transition: all 0.3s ease;
+            border-radius: 6px; /* rounded-md */
+            font-weight: 500;
+            border: 1px solid #4b5563;
+        }
+        .nav-link.active {
+            font-weight: 600;
+            /* Menggunakan Variabel Tema */
+            color: #ffffff !important;
+            background-color: var(--theme-600);
+            border-color: var(--theme-600);
+        }
+        .nav-link:not(.active):hover {
+            background-color: #f1f5f9; /* gray-100 */
+            /* Menggunakan Variabel Tema */
+            color: var(--theme-800);
+            border-color: #94a3b8;
+        }
+
+        /* Aturan ini akan membuat teks panjang pindah baris (wrap) */
+        table td {
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+
+        /* [PERUBAHAN] Style untuk Loading Spinner diganti jadi animasi melompat */
+        .jumping-dots-loader {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 50px; /* Sesuaikan tinggi jika perlu */
+        }
+        .jumping-dots-loader span {
+            height: 12px;
+            width: 12px;
+            margin: 0 4px;
+            background-color: var(--theme-600);
+            border-radius: 50%;
+            animation: jump 1.4s infinite ease-in-out both;
+        }
+        .jumping-dots-loader span:nth-child(1) {
+            animation-delay: -0.32s;
+        }
+        .jumping-dots-loader span:nth-child(2) {
+            animation-delay: -0.16s;
+        }
+
+        @keyframes jump {
+            0%, 80%, 100% {
+                transform: translateY(0);
+                opacity: 0.8;
+            }
+            40% {
+                transform: translateY(-15px);
+                opacity: 1;
+            }
+        }
+        /* Akhir dari perubahan style loading */
+
+        /* Style untuk Step Form Wizard */
+        .step-container {
+            display: none;
+        }
+        .step-container.active {
+            display: block;
+        }
+
+        /* Style untuk highlight baris sementara */
+        @keyframes fadeOutHighlight {
+            from { background-color: var(--highlight-color); }
+            to { background-color: transparent; }
+        }
+        .highlight-new {
+            --highlight-color: #e0ffe0; /* Hijau muda */
+            animation: fadeOutHighlight 3s ease-out forwards;
+        }
+        .highlight-edit {
+            --highlight-color: #ffffe0; /* Kuning muda */
+            animation: fadeOutHighlight 3s ease-out forwards;
+        }
+
+        /* [PERBAIKAN] Menambahkan min-height untuk textarea agar tidak gepeng */
+        .auto-resize-textarea {
+            min-height: 80px; /* Sekitar 3-4 baris teks */
+            overflow-y: hidden;
+            resize: none;
+        }
+
+        /* [BARU] Style untuk Modal Preview */
+        #preview-modal-content dl {
+            display: grid;
+            grid-template-columns: auto 1fr; /* Label dan Value */
+            gap: 8px 16px; /* Jarak baris dan kolom */
+        }
+        #preview-modal-content dt {
+            font-weight: 500; /* Medium */
+            color: #4b5563; /* gray-600 */
+            grid-column: 1;
+        }
+        #preview-modal-content dd {
+            color: #1f2937; /* gray-800 */
+            grid-column: 2;
+            word-break: break-word; /* Agar teks panjang tidak overflow */
+        }
+
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 antialiased">
+
+    <!-- Kontainer Utama -->
+    <div class="flex flex-col min-h-screen">
+
+        <!-- Header -->
+        <header class="bg-white shadow-sm sticky top-0 z-20">
+            <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between items-center h-16">
+                    <!-- Logo / Judul Kiri -->
+                    <div class="flex items-center space-x-2">
+                        <span class="text-xl font-semibold text-[var(--theme-800)] tracking-tight">Sistem Validasi Profesional</span>
+                    </div>
+                    <!-- Navigasi Kanan -->
+                    <div id="navigation-links" class="flex items-center space-x-2">
+                        <a data-table-id="m_izin" class="nav-link text-gray-600 text-sm active">m_izin</a>
+                        <a data-table-id="m_izin_umku" id="nav-m_izin_umku" class="nav-link text-gray-600 text-sm">m_izin_umku</a>
+                        <a data-table-id="m_kbli_izin" id="nav-m_kbli_izin" class="nav-link text-gray-600 text-sm">m_kbli_izin</a>
+                        <a data-table-id="m_izin_umku_kewenangan" class="nav-link text-gray-600 text-sm">m_izin_umku_kewenangan</a>
+                        <a data-table-id="m_izin_syarat" class="nav-link text-gray-600 text-sm">m_izin_syarat</a>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Konten Utama -->
+        <main id="main-content" class="flex-grow container mx-auto p-4 sm:p-6 lg:p-8 transition-opacity duration-300 ease-in-out">
+
+            <!-- Judul Halaman dan Kontrol (Dinamis) -->
+            <div class="mb-6">
+                <h1 id="page-title" class="text-3xl font-bold text-gray-900">Manajemen Data Izin UMKU Kewenangan</h1>
+                <p id="page-subtitle" class="mt-1 text-gray-600 text-lg">Kelola data kewenangan izin UMKU di satu tempat.</p>
+            </div>
+
+            <!-- Kontrol: Search dan Tombol Tambah -->
+            <div class="bg-white p-4 rounded-lg shadow-sm mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <!-- Search Bar -->
+                <div class="relative w-full sm:w-1/2 lg:w-1/3">
+                    <input type="text" id="searchInput" placeholder="Cari berdasarkan deskripsi..." class="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--theme-focus-ring)] focus:border-[var(--theme-600)] transition-colors duration-150 text-sm">
+                    <div class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                    </div>
+                </div>
+
+                <!-- Grup Tombol -->
+                <div class="flex flex-col sm:flex-row gap-3">
+                    <button id="tambahButton" class="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 bg-[var(--theme-600)] text-white font-semibold rounded-lg shadow-md hover:bg-[var(--theme-700)] focus:outline-none focus:ring-2 focus:ring-[var(--theme-focus-ring)] focus:ring-offset-2 transition duration-150 text-sm">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                        Tambah Data
+                    </button>
+                    <button id="umkuKhususButton" class="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500/50 focus:ring-offset-2 transition duration-150 text-sm">
+                        <!-- Konten diisi JS -->
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tabel Data -->
+            <div class="bg-white shadow-sm rounded-lg overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full min-w-max">
+                        <thead id="table-header" class="bg-gray-50"></thead>
+                        <tbody id="tableBody" class="bg-white divide-y divide-gray-100"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Kontrol Paginasi -->
+            <div id="pagination-controls" class="hidden mt-6 bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6 rounded-lg shadow-sm">
+                <div class="flex items-center text-sm">
+                    <label for="itemsPerPage" class="text-gray-600 mr-2">Tampilkan:</label>
+                    <select id="itemsPerPageSelect" name="itemsPerPage" class="text-sm border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[var(--theme-focus-ring)] focus:border-[var(--theme-600)] transition-colors duration-150">
+                        <option value="10">10</option>
+                        <option value="20">20</option>
+                        <option value="30">30</option>
+                        <option value="40">40</option>
+                        <option value="50">50</option>
+                    </select>
+                    <span class="text-gray-600 ml-2">baris per halaman</span>
+                </div>
+                <div class="flex items-center">
+                    <p id="pageInfo" class="text-sm text-gray-600 mr-4"></p>
+                    <div class="flex gap-2">
+                        <button id="prevButton" class="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">Sebelumnya</button>
+                        <button id="nextButton" class="px-3 py-1 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">Selanjutnya</button>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="fixed inset-0 bg-gray-900 bg-opacity-60 z-50 hidden flex items-center justify-center backdrop-blur-sm transition-opacity duration-300">
+        <div class="flex flex-col items-center justify-center bg-white py-6 px-10 rounded-lg shadow-xl">
+            <!-- [PERUBAHAN] Mengganti div.loader dengan div.jumping-dots-loader -->
+            <div class="jumping-dots-loader">
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+            <p id="loading-text" class="text-gray-700 font-semibold mt-4 text-base">Memuat Data...</p>
+            <p id="loading-subtext" class="text-gray-500 text-sm mt-1">Mohon tunggu sebentar.</p>
+        </div>
+    </div>
+
+    <!-- Notifikasi Toast -->
+    <div id="toast-notification" class="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-[var(--theme-600)] text-white px-6 py-3 rounded-lg shadow-lg flex items-center gap-3 transition-all duration-300 ease-in-out opacity-0 -translate-y-10 hidden">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+        <span id="toast-message" class="font-medium"></span>
+    </div>
+
+    <!-- Modal Backdrop -->
+    <div id="modal-backdrop" class="fixed inset-0 bg-black bg-opacity-50 z-30 hidden transition-opacity duration-300"></div>
+
+    <!-- Modal Form -->
+    <div id="form-modal" class="fixed inset-0 z-40 hidden flex items-center justify-center p-4 transition-all duration-300 scale-95 opacity-0">
+        <div class="bg-white w-full max-w-2xl rounded-lg shadow-xl transform transition-all max-h-[90vh] flex flex-col">
+            <div class="flex-shrink-0 flex items-center justify-between p-4 border-b border-gray-200">
+                <h3 id="modal-title" class="text-xl font-semibold">Tambah Data Baru</h3>
+                <button id="close-form-modal" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <form id="data-form" class="flex-grow overflow-y-auto p-6 space-y-4">
+                <input type="hidden" id="modal-id-key">
+                <input type="hidden" id="modal-id-value">
+                <div id="form-fields-container" class="space-y-4"></div>
+                <div class="pt-4 flex justify-between items-center gap-3 border-t border-gray-200 mt-6 sticky bottom-0 bg-white py-4 px-6 -mx-6 -mb-6 rounded-b-lg">
+                    <span id="step-indicator" class="text-sm font-medium text-gray-600"></span>
+                    <div class="flex gap-3">
+                        <button type="button" id="cancel-form-button" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors duration-150 text-sm">Batal</button>
+                        <button type="button" id="prev-step-button" class="px-4 py-2 bg-white text-gray-800 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors duration-150 text-sm hidden">Sebelumnya</button>
+                        <button type="button" id="next-step-button" class="px-4 py-2 bg-[var(--theme-600)] text-white font-semibold rounded-lg shadow-md hover:bg-[var(--theme-700)] focus:outline-none focus:ring-2 focus:ring-[var(--theme-focus-ring)] focus:ring-offset-2 transition duration-150 text-sm hidden">Selanjutnya</button>
+                        <button type="submit" id="submit-form-button" class="px-4 py-2 bg-[var(--theme-600)] text-white font-semibold rounded-lg shadow-md hover:bg-[var(--theme-700)] focus:outline-none focus:ring-2 focus:ring-[var(--theme-focus-ring)] focus:ring-offset-2 transition duration-150 text-sm hidden">Simpan Perubahan</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Konfirmasi Hapus -->
+    <div id="delete-modal" class="fixed inset-0 z-40 hidden flex items-center justify-center p-4 transition-all duration-300 scale-95 opacity-0">
+        <div class="bg-white w-full max-w-md rounded-lg shadow-xl transform transition-all">
+            <div class="p-6">
+                <div class="flex items-start gap-4">
+                    <div class="flex-shrink-0 w-12 h-12 flex items-center justify-center rounded-full bg-red-100">
+                        <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                    </div>
+                    <div>
+                        <h3 class="text-xl font-semibold text-gray-900">Hapus Data Ini?</h3>
+                        <p class="mt-2 text-gray-600 text-sm">Apakah Anda yakin ingin menghapus data ini? Tindakan ini tidak dapat dibatalkan.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 px-6 py-4 flex justify-end gap-3 rounded-b-lg">
+                <button type="button" id="cancel-delete-button" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors duration-150 text-sm">Batal</button>
+                <button type="button" id="confirm-delete-button" class="px-4 py-2 bg-red-600 text-white font-semibold rounded-lg shadow-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:ring-offset-2 transition duration-150 text-sm">Hapus Data</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- [BARU] Modal Preview Data -->
+    <div id="preview-modal" class="fixed inset-0 z-40 hidden flex items-center justify-center p-4 transition-all duration-300 scale-95 opacity-0">
+        <div class="bg-white w-full max-w-xl rounded-lg shadow-xl transform transition-all max-h-[90vh] flex flex-col">
+            <!-- Header Modal -->
+            <div class="flex-shrink-0 flex items-center justify-between p-4 border-b border-gray-200">
+                <h3 id="preview-modal-title" class="text-xl font-semibold text-gray-800">Detail Data</h3>
+                <button id="close-preview-modal" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <!-- Konten Modal -->
+            <div id="preview-modal-content" class="flex-grow overflow-y-auto p-6 text-sm">
+                <!-- Konten detail akan dimasukkan oleh JavaScript -->
+                <dl>
+                    <!-- Contoh: <dt>ID:</dt><dd>123</dd> -->
+                </dl>
+            </div>
+            <!-- Footer Modal -->
+            <div class="bg-gray-50 px-6 py-4 flex justify-end gap-3 rounded-b-lg">
+                <button type="button" id="close-preview-modal-footer" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors duration-150 text-sm">Tutup</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+
+            // --- 1. STATE APLIKASI ---
+            const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxgVAXdVHksuj2qwc9lwubJKBoG7JnFYhhK6SYzQbeukBwPkMoad4wwNjJXaMLabUly/exec';
+            let currentTable = 'm_izin';
+            let currentPage = 1;
+            let itemsPerPage = 10;
+            let currentStep = 1;
+            let totalSteps = 1; // Default
+            let currentUmkuMode = 'umum';
+            let toastTimer = null;
+
+            let tableCache = {
+                'm_izin': [],
+                'm_izin_umku': [],
+                'm_kbli_izin': [],
+                'm_izin_umku_kewenangan': [],
+                'm_izin_syarat': []
+            };
+
+            // --- 3. KONFIGURASI TABEL & FORM DINAMIS ---
+            // [PERBAIKAN] Pastikan primaryKey didefinisikan untuk SEMUA tabel
+            const tableConfig = {
+                'm_izin': {
+                    title: 'Manajemen Data Izin (m_izin)',
+                    subtitle: 'Kelola semua data perizinan.',
+                    searchPlaceholder: 'Cari berdasarkan ID LIC atau nama dokumen...',
+                    primaryKey: 'id_lic',
+                    columns: [ { key: 'id_lic', label: 'ID LIC' }, { key: 'nama_dokumen', label: 'Nama Dokumen' }, { key: 'jenis_perizinan', label: 'Jenis' }, { key: 'sektor', label: 'Sektor' }, { key: 'aktif', label: 'Aktif' } ],
+                    formFields: [ { key: 'id_lic', label: 'ID LIC', type: 'text', required: true, step: 1 }, { key: 'jenis_perizinan', label: 'Jenis Perizinan', type: 'text', required: false, step: 1 }, { key: 'nama_dokumen', label: 'Nama Dokumen', type: 'textarea', required: true, step: 1 }, { key: 'flag_pnbp', label: 'Flag PNBP', type: 'select', options: ['Y', 'N'], required: false, step: 1 }, { key: 'sla', label: 'SLA', type: 'number', required: false, step: 1 }, { key: 'sla_tipe', label: 'Tipe SLA', type: 'text', required: false, step: 1 }, { key: 'dasar_hukum', label: 'Dasar Hukum', type: 'textarea', required: false, step: 2 }, { key: 'keterangan', label: 'Keterangan', type: 'textarea', required: false, step: 2 }, { key: 'url', label: 'URL', type: 'text', required: false, step: 2 }, { key: 'url_aplikasi', label: 'URL Aplikasi', type: 'text', required: false, step: 2 }, { key: 'ip_whitelist', label: 'IP Whitelist', type: 'textarea', required: false, step: 2 }, { key: 'versi_pia', label: 'Versi PIA', type: 'text', required: false, step: 2 }, { key: 'url_check_komitmen', label: 'URL Cek Komitmen', type: 'text', required: false, step: 3 }, { key: 'flag_integrasi', label: 'Flag Integrasi', type: 'select', options: ['Y', 'N'], required: false, step: 3 }, { key: 'aktif', label: 'Aktif', type: 'select', options: ['Y', 'N'], required: false, step: 3 }, { key: 'keterangan_aktif', label: 'Keterangan Aktif', type: 'textarea', required: false, step: 3 }, { key: 'url_umk', label: 'URL UMK', type: 'text', required: false, step: 3 }, { key: 'url_stpw', label: 'URL STPW', type: 'text', required: false, step: 3 }, { key: 'flag_tampil', label: 'Flag Tampil', type: 'select', options: ['Y', 'N'], required: false, step: 3 }, { key: 'flag_tampil_iumk', label: 'Flag Tampil IUMK', type: 'select', options: ['Y', 'N'], required: false, step: 4 }, { key: 'flag_inpres7', label: 'Flag Inpres 7', type: 'select', options: ['Y', 'N'], required: false, step: 4 }, { key: 'url_send_file_ds', label: 'URL Kirim File DS', type: 'text', required: false, step: 4 }, { key: 'sektor', label: 'Sektor', type: 'text', required: false, step: 4 }, { key: 'url_sso', label: 'URL SSO', type: 'text', required: false, step: 4 }, { key: 'url_api', label: 'URL API', type: 'text', required: false, step: 4 }, { key: 'flag_pemenuhan_persyaratan', label: 'Flag Pemenuhan Persyaratan', type: 'select', options: ['Y', 'N'], required: false, step: 4 }, { key: 'flag_tanpa_izin_berlaku', label: 'Flag Tanpa Izin Berlaku', type: 'select', options: ['Y', 'N'], required: false, step: 5 }, { key: 'nama_dokumen_en', label: 'Nama Dokumen (EN)', type: 'textarea', required: false, step: 5 }, { key: 'flag_teknis', label: 'Flag Teknis', type: 'select', options: ['Y', 'N'], required: false, step: 5 }, { key: 'jangka_waktu', label: 'Jangka Waktu', type: 'number', required: false, step: 5 }, { key: 'satuan_jangka_waktu', label: 'Satuan Jangka Waktu', type: 'text', required: false, step: 5 }, { key: 'flag_hybrid', label: 'Flag Hybrid', type: 'select', options: ['Y', 'N'], required: false, step: 5 }, { key: 'flag_pemberhentian_sementara', label: 'Flag Pemberhentian Sementara', type: 'select', options: ['Y', 'N'], required: false, step: 5 }, { key: 'alasan_pemberhentian', label: 'Alasan Pemberhentian', type: 'textarea', required: false, step: 5 }, { key: 'jenis_lic', label: 'Jenis LIC', type: 'text', required: false, step: 5 }, { key: 'url_send_status', label: 'URL Kirim Status', type: 'text', required: false, step: 5 }, { key: 'created', label: 'Created', type: 'text', required: false, step: 5 }, { key: 'updated', label: 'Updated', type: 'text', required: false, step: 5 } ]
+                },
+                'm_izin_umku': {
+                    title: 'Manajemen Data Izin UMKU (m_izin_umku)',
+                    subtitle: 'Kelola data jenis izin UMKU.',
+                    searchPlaceholder: 'Cari berdasarkan ID Izin (id_lic)...',
+                    primaryKey: 'id_umku',
+                    columns: [ { key: 'id_umku', label: 'ID UMKU' }, { key: 'id_lic', label: 'ID LIC' }, { key: 'jenis_perizinan', label: 'Jenis' }, { key: 'jenis_kegiatan', label: 'Jenis Kegiatan' }, { key: 'flag_aktif', label: 'Aktif' }, { key: 'flag_wajib', label: 'Flag Wajib' } ],
+                    formFields: [ { key: 'id_umku', label: 'ID UMKU', type: 'text', required: true, step: 1 }, { key: 'id_lic', label: 'ID LIC', type: 'text', required: true, step: 1 }, { key: 'jenis_perizinan', label: 'Jenis', type: 'text', required: false, step: 1 }, { key: 'flag_aktif', label: 'Aktif', type: 'select', options: ['Y', 'N'], step: 1 }, { key: 'flag_wajib', label: 'Flag Wajib', type: 'select', options: ['Y', 'N'], step: 1 }, { key: 'flag_mapping_old', label: 'Flag Mapping Old', type: 'select', options: ['Y', 'N'], step: 2 }, { key: 'id_bidang_spesifik', label: 'ID Bidang Spesifik', type: 'text', required: false, step: 2 }, { key: 'jenis_kegiatan', label: 'Jenis Kegiatan', type: 'text', required: false, step: 2 }, { key: 'flag_produk', label: 'Flag Produk', type: 'select', options: ['Y', 'N'], step: 2 }, { key: 'id_cakupan_produk', label: 'ID Cakupan Produk', type: 'text', required: false, step: 2 }, { key: 'tipe_cakupan', label: 'Tipe Cakupan', type: 'text', required: false, step: 2 }, ]
+                },
+                'm_kbli_izin': {
+                    title: 'Manajemen Data KBLI Izin (m_kbli_izin)',
+                    subtitle: 'Kelola data relasi KBLI dengan perizinan.',
+                    searchPlaceholder: 'Cari berdasarkan KBLI atau ID LIC...',
+                    primaryKey: 'kbli', // Asumsi 'kbli' unik. Ganti jika perlu (misal, `primaryKey: ['kbli', 'id_lic']` jika kombinasi)
+                    columns: [ { key: 'kbli', label: 'KBLI' }, { key: 'id_lic', label: 'ID LIC' }, { key: 'jenis_perizinan', label: 'Jenis Perizinan' }, { key: 'sektor', label: 'Sektor' } ],
+                    formFields: [ { key: 'kbli', label: 'KBLI', type: 'text', required: true, step: 1 }, { key: 'id_lic', label: 'ID LIC', type: 'text', required: true, step: 1 }, { key: 'jenis_perizinan', label: 'Jenis Perizinan', type: 'textarea', required: false, step: 1 }, { key: 'sektor', label: 'Sektor', type: 'text', required: false, step: 1 } ]
+                },
+                'm_izin_umku_kewenangan': {
+                    title: 'Manajemen Data Kewenangan (m_izin_umku_kewenangan)',
+                    subtitle: 'Kelola data kewenangan izin UMKU.',
+                    searchPlaceholder: 'Cari berdasarkan kriteria kegiatan...',
+                    primaryKey: 'id_umku_kewenangan',
+                    columns: [ { key: 'id_umku_kewenangan', label: 'ID Kewenangan' }, { key: 'id_umku', label: 'ID UMKU' }, { key: 'kriteria_kegiatan', label: 'Kriteria Kegiatan' }, { key: 'kode_kewenangan', label: 'Kode' }, { key: 'flag_pma', label: 'Flag PMA' }, { key: 'flag_integrasi', label: 'Integrasi' }, { key: 'flag_aktif', label: 'Aktif' } ],
+                    formFields: [ { key: 'id_umku_kewenangan', label: 'ID Kewenangan', type: 'text', required: true, step: 1 }, { key: 'id_umku', label: 'ID UMKU', type: 'text', required: false, step: 1 }, { key: 'kriteria_kegiatan', label: 'Kriteria Kegiatan', type: 'textarea', required: true, step: 1 }, { key: 'kode_kewenangan', label: 'Kode', type: 'text', required: false, step: 2 }, { key: 'flag_pma', label: 'Flag PMA', type: 'select', options: ['Y', 'N'], required: false, step: 2 }, { key: 'flag_lintas_daerah', label: 'Flag Lintas Daerah', type: 'select', options: ['Y', 'N'], required: false, step: 2 }, { key: 'flag_aktif', label: 'Aktif', type: 'select', options: ['Y', 'N'], step: 2 }, { key: 'id_mapping_izin', label: 'ID Mapping Izin', type: 'text', required: false, step: 3 }, { key: 'flag_integrasi', label: 'Flag Integrasi', type: 'select', options: ['Y', 'N'], required: false, step: 3 } ]
+                },
+                'm_izin_syarat': {
+                    title: 'Manajemen Data Syarat Izin (m_izin_syarat)',
+                    subtitle: 'Kelola daftar persyaratan mendetail untuk perizinan.',
+                    searchPlaceholder: 'Cari berdasarkan ID Syarat atau ID LIC...',
+                    primaryKey: 'id_izin_syarat',
+                    columns: [ { key: 'id_izin_syarat', label: 'ID Syarat' }, { key: 'id_lic', label: 'ID LIC' }, { key: 'syarat_perizinan', label: 'Syarat Perizinan' }, { key: 'tipe_syarat', label: 'Tipe' }, { key: 'urutan', label: 'Urutan' }, { key: 'flag_aktif', label: 'Aktif' } ],
+                    formFields: [ { key: 'id_izin_syarat', label: 'ID Syarat', type: 'text', required: true, step: 1 }, { key: 'id_lic', label: 'ID LIC', type: 'text', required: true, step: 1 }, { key: 'syarat_perizinan', label: 'Syarat Perizinan (ID)', type: 'textarea', required: true, step: 1 }, { key: 'tipe_syarat', label: 'Tipe Syarat', type: 'text', required: false, step: 2 }, { key: 'flag_opsional', label: 'Flag Opsional', type: 'select', options: ['Y', 'N'], required: false, step: 2 }, { key: 'jangka_waktu', label: 'Jangka Waktu', type: 'number', required: false, step: 2 }, { key: 'satuan_jangka_waktu', label: 'Satuan Jangka Waktu', type: 'text', required: false, step: 2 }, { key: 'id_referensi', label: 'ID Referensi', type: 'text', required: false, step: 2 }, { key: 'persyaratan_perizinan', label: 'Persyaratan Perizinan', type: 'textarea', required: false, step: 2 }, { key: 'urutan', label: 'Urutan', type: 'number', required: false, step: 2 }, { key: 'id_lampiran_syarat_umku', label: 'ID Lampiran Syarat UMKU', type: 'text', required: false, step: 3 }, { key: 'flag_syarat_tambahan_umku', label: 'Flag Syarat Tambahan UMKU', type: 'select', options: ['Y', 'N'], required: false, step: 3 }, { key: 'flag_syarat_umku_khusus', label: 'Flag Syarat UMKU Khusus', type: 'select', options: ['Y', 'N'], required: false, step: 3 }, { key: 'id_umku_kewenangan', label: 'ID Kewenangan UMKU', type: 'text', required: false, step: 3 }, { key: 'tipe_dokumen', label: 'Tipe Dokumen', type: 'text', required: false, step: 3 }, { key: 'flag_aktif', label: 'Flag Aktif', type: 'select', options: ['Y', 'N'], required: false, step: 3 }, { key: 'syarat_perizinan_en', label: 'Syarat Perizinan (EN)', type: 'textarea', required: false, step: 4 }, { key: 'id_aktivitas', label: 'ID Aktivitas', type: 'text', required: false, step: 4 }, { key: 'jenis_kegiatan', label: 'Jenis Kegiatan', type: 'text', required: false, step: 4 }, { key: 'jenis_kawasan', label: 'Jenis Kawasan', type: 'text', required: false, step: 4 }, { key: 'detail_validasi', label: 'Detail Validasi', type: 'textarea', required: false, step: 5 }, { key: 'parameter_syarat', label: 'Parameter Syarat', type: 'textarea', required: false, step: 5 }, { key: 'tooltip_syarat_perizinan', label: 'Tooltip Syarat Perizinan', type: 'textarea', required: false, step: 5 } ]
+                }
+            };
+
+            // --- 4. SELEKTOR ELEMEN DOM ---
+            const tableHeader = document.getElementById('table-header');
+            const tableBody = document.getElementById('tableBody');
+            const searchInput = document.getElementById('searchInput');
+            const tambahButton = document.getElementById('tambahButton');
+            const umkuKhususButton = document.getElementById('umkuKhususButton');
+            const navMInzinUmku = document.getElementById('nav-m_izin_umku');
+            const navMKbliIzin = document.getElementById('nav-m_kbli_izin');
+            const navigationLinks = document.getElementById('navigation-links');
+
+            const mainContent = document.getElementById('main-content');
+            const pageTitle = document.getElementById('page-title');
+            const pageSubtitle = document.getElementById('page-subtitle');
+
+            const loadingOverlay = document.getElementById('loading-overlay');
+            const loadingOverlayText = document.getElementById('loading-text');
+            const loadingSubtext = document.getElementById('loading-subtext');
+
+            const toastNotification = document.getElementById('toast-notification');
+            const toastMessage = document.getElementById('toast-message');
+
+            const modalBackdrop = document.getElementById('modal-backdrop');
+            const formModal = document.getElementById('form-modal');
+            const modalTitle = document.getElementById('modal-title');
+            const dataForm = document.getElementById('data-form');
+            const formFieldsContainer = document.getElementById('form-fields-container');
+            const modalIdKeyInput = document.getElementById('modal-id-key');
+            const modalIdValueInput = document.getElementById('modal-id-value');
+            const closeFormModalButton = document.getElementById('close-form-modal');
+            const cancelFormButton = document.getElementById('cancel-form-button');
+            const prevStepButton = document.getElementById('prev-step-button');
+            const nextStepButton = document.getElementById('next-step-button');
+            const submitFormButton = document.getElementById('submit-form-button');
+            const stepIndicator = document.getElementById('step-indicator');
+
+            const deleteModal = document.getElementById('delete-modal');
+            const cancelDeleteButton = document.getElementById('cancel-delete-button');
+            const confirmDeleteButton = document.getElementById('confirm-delete-button');
+
+            // [BARU] Selektor untuk Modal Preview
+            const previewModal = document.getElementById('preview-modal');
+            const previewModalTitle = document.getElementById('preview-modal-title');
+            const previewModalContent = document.getElementById('preview-modal-content').querySelector('dl');
+            const closePreviewModalButton = document.getElementById('close-preview-modal');
+            const closePreviewModalFooterButton = document.getElementById('close-preview-modal-footer');
+
+
+            const paginationControls = document.getElementById('pagination-controls');
+            const itemsPerPageSelect = document.getElementById('itemsPerPageSelect');
+            const pageInfo = document.getElementById('pageInfo');
+            const prevButton = document.getElementById('prevButton');
+            const nextButton = document.getElementById('nextButton');
+
+            // Ikon menggunakan Variabel Tema
+            // [BARU] Menambahkan ikon preview
+            const previewIcon = `<svg class="w-5 h-5 text-gray-500 hover:text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`;
+            const editIcon = `<svg class="w-5 h-5 text-[var(--theme-600)] hover:text-[var(--theme-800)]" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>`;
+            const deleteIcon = `<svg class="w-5 h-5 text-red-500 hover:text-red-700" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>`;
+            const umkuKhususIcon = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 20 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>`;
+            const umkuUmumIcon = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>`;
+
+
+            // --- 5. FUNGSI UTAMA APLIKASI ---
+
+            function showLoading(message = 'Memuat Data...', subtext = 'Mohon tunggu sebentar.') {
+                loadingOverlayText.textContent = message;
+                loadingSubtext.textContent = subtext;
+                loadingOverlay.classList.remove('hidden');
+            }
+
+            function hideLoading() {
+                loadingOverlay.classList.add('hidden');
+            }
+
+            function showToast(message, type = 'info', duration = 3000) {
+                if (toastTimer) clearTimeout(toastTimer);
+                toastMessage.textContent = message;
+                toastNotification.classList.remove('bg-[var(--theme-600)]', 'bg-green-600', 'bg-red-600');
+                if (type === 'success') toastNotification.classList.add('bg-green-600');
+                else if (type === 'error') toastNotification.classList.add('bg-red-600');
+                else toastNotification.classList.add('bg-[var(--theme-600)]');
+                toastNotification.classList.remove('hidden');
+                requestAnimationFrame(() => toastNotification.classList.remove('opacity-0', '-translate-y-10'));
+                toastTimer = setTimeout(() => {
+                    toastNotification.classList.add('opacity-0', '-translate-y-10');
+                    setTimeout(() => toastNotification.classList.add('hidden'), 300);
+                }, duration);
+            }
+
+            function setUmkuMode(mode) {
+                currentUmkuMode = mode;
+                const root = document.documentElement;
+                if (mode === 'umum') {
+                    root.style.setProperty('--theme-600', '#2563eb');
+                    root.style.setProperty('--theme-700', '#1d4ed8');
+                    root.style.setProperty('--theme-800', '#1e40af');
+                    root.style.setProperty('--theme-focus-ring', '#3b82f680');
+                    umkuKhususButton.innerHTML = `${umkuKhususIcon} UMKU Khusus`;
+                    umkuKhususButton.classList.remove('bg-[var(--theme-600)]', 'hover:bg-[var(--theme-700)]', 'focus:ring-[var(--theme-focus-ring)]', 'bg-blue-600', 'hover:bg-blue-700', 'focus:ring-blue-500/50');
+                    umkuKhususButton.classList.add('bg-green-600', 'hover:bg-green-700', 'focus:ring-green-500/50');
+                    navMInzinUmku.classList.remove('hidden');
+                    navMKbliIzin.classList.add('hidden');
+                    if (currentTable === 'm_kbli_izin') setActiveTable('m_izin_umku');
+                } else {
+                    root.style.setProperty('--theme-600', '#16a34a');
+                    root.style.setProperty('--theme-700', '#15803d');
+                    root.style.setProperty('--theme-800', '#166534');
+                    root.style.setProperty('--theme-focus-ring', '#22c55e80');
+                    umkuKhususButton.innerHTML = `${umkuUmumIcon} UMKU Umum`;
+                    umkuKhususButton.classList.remove('bg-[var(--theme-600)]', 'hover:bg-[var(--theme-700)]', 'focus:ring-[var(--theme-focus-ring)]', 'bg-green-600', 'hover:bg-green-700', 'focus:ring-green-500/50');
+                    umkuKhususButton.classList.add('bg-blue-600', 'hover:bg-blue-700', 'focus:ring-blue-500/50');
+                    navMInzinUmku.classList.add('hidden');
+                    navMKbliIzin.classList.remove('hidden');
+                    if (currentTable === 'm_izin_umku') setActiveTable('m_kbli_izin');
+                }
+            }
+
+            async function setActiveTable(tableId) {
+                // Jangan fetch ulang jika tabel sama & cache ada (kecuali m_izin_umku)
+                if (currentTable === tableId && tableCache[tableId].length > 0 && tableId !== 'm_izin_umku') {
+                    // Cukup render ulang dari cache jika tabel sama
+                    renderTable();
+                    return;
+                }
+                showLoading(`Memuat data ${tableId}...`);
+                currentTable = tableId; // Set currentTable di sini
+                const config = tableConfig[currentTable];
+                if (!config) {
+                     console.error(`Konfigurasi untuk tabel ${tableId} tidak ditemukan.`);
+                     showToast(`Tabel ${tableId} tidak valid.`, 'error');
+                     hideLoading();
+                     return;
+                 }
+
+
+                document.querySelectorAll('.nav-link').forEach(link => {
+                    link.classList.remove('active');
+                    if (link.dataset.tableId === tableId) link.classList.add('active');
+                });
+
+                pageTitle.textContent = config.title || `Data ${tableId}`;
+                pageSubtitle.textContent = config.subtitle || `Kelola data ${tableId}.`;
+                searchInput.placeholder = config.searchPlaceholder || 'Cari data...';
+                searchInput.value = '';
+
+                currentPage = 1;
+                itemsPerPage = 10;
+                itemsPerPageSelect.value = 10;
+
+                generateTableHeaders(config.columns);
+                generateModalForm(config.formFields);
+
+                try {
+                    // Hanya fetch jika cache kosong
+                    if (tableCache[tableId].length === 0) {
+                        const fetchUrl = `${WEB_APP_URL}?action=read&sheet=${tableId}`;
+                        console.log("Fetching data from:", fetchUrl); // [DEBUG] Log URL
+                        const response = await fetch(fetchUrl);
+                         // [DEBUG] Periksa status response
+                        console.log("Fetch response status:", response.status);
+                        if (!response.ok) {
+                            // Coba baca teks error jika ada
+                            let errorText = await response.text();
+                            console.error("Fetch failed response text:", errorText);
+                             throw new Error(`Gagal mengambil data dari server (Status: ${response.status}). ${errorText.substring(0, 100)}`);
+                        }
+                        const result = await response.json();
+                        console.log("Fetch result:", result); // [DEBUG] Log hasil fetch
+                        if (result.success) {
+                             tableCache[tableId] = result.data;
+                        } else {
+                            throw new Error(result.message || 'Gagal memuat data dari server.');
+                        }
+                    } else {
+                         console.log(`Using cached data for ${tableId}`); // [DEBUG] Info cache
+                    }
+                    renderTable(); // Render dari cache (baik baru di-fetch atau sudah ada)
+                } catch (error) {
+                    console.error('Gagal mengambil data:', error);
+                    // [PERBAIKAN] Tampilkan pesan error yang lebih informatif
+                    showToast(`Gagal memuat data: ${error.message}`, 'error');
+                    tableBody.innerHTML = `<tr><td colspan="${(config.columns || []).length + 1}" class="px-4 py-6 text-center text-red-500">Gagal memuat data. Cek konsol.</td></tr>`;
+                } finally {
+                    hideLoading();
+                }
+            }
+
+            async function searchData() {
+                showLoading('Mencari data...');
+                const config = tableConfig[currentTable];
+                 if (!config) return;
+                const searchTerm = searchInput.value;
+                currentPage = 1;
+
+                try {
+                     const fetchUrl = `${WEB_APP_URL}?action=read&sheet=${currentTable}&search=${encodeURIComponent(searchTerm)}`;
+                     console.log("Searching data from:", fetchUrl); // [DEBUG] Log URL pencarian
+                    const response = await fetch(fetchUrl);
+                     console.log("Search response status:", response.status); // [DEBUG] Log status
+                     if (!response.ok) {
+                        let errorText = await response.text();
+                         console.error("Search failed response text:", errorText);
+                         throw new Error(`Gagal mencari data (Status: ${response.status}). ${errorText.substring(0, 100)}`);
+                     }
+                    const result = await response.json();
+                     console.log("Search result:", result); // [DEBUG] Log hasil pencarian
+                    if (result.success) {
+                        renderTable(result.data); // Render hasil pencarian
+                    } else {
+                         throw new Error(result.message || 'Gagal mencari data.');
+                    }
+                } catch (error) {
+                    console.error('Gagal mencari data:', error);
+                     showToast(`Gagal mencari data: ${error.message}`, 'error');
+                    tableBody.innerHTML = `<tr><td colspan="${(config.columns || []).length + 1}" class="px-4 py-6 text-center text-red-500">Gagal mencari data. Cek konsol.</td></tr>`;
+                } finally {
+                    hideLoading();
+                }
+            }
+
+            function generateTableHeaders(columns) {
+                tableHeader.innerHTML = '';
+                 const tr = document.createElement('tr');
+                 if (!columns || columns.length === 0) {
+                     const th = document.createElement('th');
+                     th.className = 'px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider';
+                     th.textContent = 'Aksi';
+                     tr.appendChild(th);
+                 } else {
+                    columns.forEach(col => {
+                        const th = document.createElement('th');
+                        th.className = 'px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider';
+                        th.textContent = col.label;
+                        tr.appendChild(th);
+                    });
+                    const thAksi = document.createElement('th');
+                    thAksi.className = 'px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider';
+                    thAksi.textContent = 'Aksi';
+                    tr.appendChild(thAksi);
+                 }
+                tableHeader.appendChild(tr);
+            }
+
+            function generateModalForm(formFields) {
+                formFieldsContainer.innerHTML = '';
+                if (!formFields || formFields.length === 0) {
+                    totalSteps = 1;
+                    return;
+                }
+
+                const steps = [...new Set(formFields.map(f => f.step || 1))];
+                totalSteps = steps.length;
+
+                steps.forEach(stepNum => {
+                    const stepContainer = document.createElement('div');
+                    stepContainer.className = `step-container space-y-4`;
+                    stepContainer.dataset.step = stepNum;
+                    const fieldsInStep = formFields.filter(f => (f.step || 1) === stepNum);
+                    let fieldCount = 0;
+                    let gridContainer = document.createElement('div');
+                    gridContainer.className = 'grid grid-cols-1 md:grid-cols-2 gap-4';
+
+                    fieldsInStep.forEach(field => {
+                        const fieldWrapper = document.createElement('div');
+                        // [PERBAIKAN 2.1] Logika className dipindahkan ke bawah
+                        if (field.type === 'textarea') {
+                            fieldWrapper.className = 'w-full'; // Textarea selalu full width
+                        }
+                        let fieldHtml = `<label for="${field.key}" class="block text-sm font-medium text-gray-700 mb-1">${field.label}${field.required ? ' *' : ''}</label>`;
+                        const inputClass = "w-full px-3 py-2 border border-gray-500 rounded-lg focus:outline-none focus:ring-2 focus:ring-[var(--theme-focus-ring)] focus:border-[var(--theme-600)] transition-colors duration-150 text-sm";
+                        if (field.type === 'select') {
+                            fieldHtml += `<select id="${field.key}" name="${field.key}" class="${inputClass}">`;
+                            (field.options || []).forEach(opt => fieldHtml += `<option value="${opt}">${opt}</option>`);
+                            fieldHtml += `</select>`;
+                        } else if (field.type === 'textarea') {
+                            // [PERBAIKAN] Mengganti rows="3" dan style inline dengan class
+                            fieldHtml += `<textarea id="${field.key}" name="${field.key}" class="${inputClass} auto-resize-textarea" ${field.required ? 'required' : ''}></textarea>`;
+                        } else {
+                            fieldHtml += `<input type="${field.type || 'text'}" id="${field.key}" name="${field.key}" class="${inputClass}" ${field.required ? 'required' : ''}>`;
+                        }
+                        fieldWrapper.innerHTML = fieldHtml;
+
+                        if (field.type === 'textarea') {
+                            if (fieldCount > 0) stepContainer.appendChild(gridContainer);
+                            stepContainer.appendChild(fieldWrapper);
+                            gridContainer = document.createElement('div');
+                            gridContainer.className = 'grid grid-cols-1 md:grid-cols-2 gap-4';
+                            fieldCount = 0;
+                        } else {
+                            // [PERBAIKAN 2.2] Menghapus border aneh di antara kolom
+                            // if (fieldCount === 1) fieldWrapper.classList.add('pl-4', 'border-l', 'border-gray-200'); // <-- DIHAPUS
+                            gridContainer.appendChild(fieldWrapper);
+                            fieldCount++;
+                            if (fieldCount === 2) {
+                                stepContainer.appendChild(gridContainer);
+                                gridContainer = document.createElement('div');
+                                gridContainer.className = 'grid grid-cols-1 md:grid-cols-2 gap-4';
+                                fieldCount = 0;
+                            }
+                        }
+                    });
+                    // [PERBAIKAN 2.3] Memperbaiki layout kolom terakhir yang sendirian
+                    if (fieldCount > 0) {
+                        if (fieldCount === 1 && gridContainer.children[0]) {
+                            // Jika hanya ada 1 item tersisa di grid, buat item itu full-width (col-span-2)
+                            gridContainer.children[0].classList.add('md:col-span-2');
+                        }
+                        stepContainer.appendChild(gridContainer);
+                    }
+                    formFieldsContainer.appendChild(stepContainer);
+                });
+            }
+
+            function renderTable(data = null) {
+                tableBody.innerHTML = '';
+                const config = tableConfig[currentTable];
+                 if (!config) return;
+                const columns = config.columns || [];
+                const primaryKey = config.primaryKey || (columns.length > 0 ? columns[0].key : null);
+                const fullDataToRender = data !== null ? data : tableCache[currentTable];
+                const totalItems = fullDataToRender.length;
+                const colSpan = columns.length + 1;
+
+                if (totalItems === 0) {
+                    tableBody.innerHTML = `<tr><td colspan="${colSpan}" class="px-4 py-6 text-center text-gray-500">Tidak ada data ditemukan.</td></tr>`;
+                    paginationControls.classList.add('hidden');
+                    return;
+                }
+
+                const startIndex = (currentPage - 1) * itemsPerPage;
+                const endIndex = startIndex + itemsPerPage;
+                const paginatedData = fullDataToRender.slice(startIndex, endIndex);
+
+                paginatedData.forEach(item => {
+                    const tr = document.createElement('tr');
+                    const itemId = primaryKey && item[primaryKey] !== undefined ? item[primaryKey] : null;
+                    if (itemId !== null) tr.id = `row-${currentTable}-${itemId}`;
+                    tr.className = 'hover:bg-gray-50';
+
+                    columns.forEach(col => {
+                        const td = document.createElement('td');
+                        let classes = 'px-4 py-3 text-sm text-gray-600 align-top';
+                        // Perbaiki logika whitespace-nowrap
+                        if (col.key === primaryKey || col.key.startsWith('id_') || col.key.includes('flag_') || ['jenis_perizinan', 'tipe_syarat', 'kode_kewenangan', 'aktif', 'sektor', 'kbli'].includes(col.key)) {
+                             classes += ' whitespace-nowrap';
+                        }
+                        if (['nama_dokumen', 'kriteria_kegiatan', 'syarat_perizinan', 'judul_kbli', 'jenis_perizinan'].includes(col.key)) {
+                            classes += ' min-w-[200px] max-w-[400px]';
+                        }
+                        td.className = classes;
+                        let cellValue = item[col.key];
+
+                        if (['status', 'aktif', 'flag_aktif', 'flag_pma', 'flag_integrasi', 'flag_wajib'].includes(col.key)) {
+                            let statusBadge = '';
+                            if (['Sesuai', 'Aktif', 'Y'].includes(cellValue)) statusBadge = `<span class="px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">${cellValue || 'Y'}</span>`;
+                            else if (['Hapus', 'Tidak Aktif', 'N'].includes(cellValue)) statusBadge = `<span class="px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">${cellValue || 'N'}</span>`;
+                            else statusBadge = `<span class="px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">${cellValue || '-'}</span>`;
+                            td.innerHTML = statusBadge;
+                        } else if (col.key.includes('modal')) {
+                             td.textContent = cellValue ? new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(cellValue) : '';
+                             td.classList.add('font-mono');
+                        } else if (col.key === 'syarat_perizinan') {
+                             td.innerHTML = cellValue || '';
+                        } else {
+                             td.textContent = cellValue !== null && cellValue !== undefined ? cellValue : '';
+                        }
+
+                        if (col.key === primaryKey) td.classList.add('font-medium', 'text-gray-900');
+                        tr.appendChild(td);
+                    });
+
+                    const tdAksi = document.createElement('td');
+                    // [PERUBAHAN] Menambah spasi antar tombol (ml-2)
+                    tdAksi.className = 'px-4 py-3 whitespace-nowrap text-sm font-medium align-top flex items-center gap-2'; // Menggunakan flex dan gap
+                    tdAksi.innerHTML = `
+                        <button data-preview-id="${itemId || ''}" class="preview-btn p-1 ${itemId === null ? 'cursor-not-allowed opacity-50' : ''}" ${itemId === null ? 'disabled' : ''}>${previewIcon}</button>
+                        <button data-edit-id="${itemId || ''}" class="edit-btn p-1 ${itemId === null ? 'cursor-not-allowed opacity-50' : ''}" ${itemId === null ? 'disabled' : ''}>${editIcon}</button>
+                        <button data-delete-id="${itemId || ''}" class="delete-btn p-1 ${itemId === null ? 'cursor-not-allowed opacity-50' : ''}" ${itemId === null ? 'disabled' : ''}>${deleteIcon}</button>
+                    `;
+                    tr.appendChild(tdAksi);
+                    tableBody.appendChild(tr);
+                });
+
+                updatePaginationControls(totalItems, startIndex, paginatedData.length);
+            }
+
+            function updatePaginationControls(totalItems, startIndex, renderedCount) {
+                if (totalItems <= itemsPerPage && currentPage === 1) {
+                    paginationControls.classList.add('hidden');
+                } else {
+                    paginationControls.classList.remove('hidden');
+                    const startNum = totalItems === 0 ? 0 : startIndex + 1;
+                    const endNum = startIndex + renderedCount;
+                    pageInfo.textContent = `Menampilkan ${startNum} - ${endNum} dari ${totalItems} data`;
+                    prevButton.disabled = (currentPage === 1);
+                    nextButton.disabled = (endNum >= totalItems);
+                }
+            }
+
+            // --- 6. FUNGSI MODAL ---
+
+            function autoResizeTextarea(element) {
+                element.style.height = 'auto';
+                // [PERBAIKAN] Biarkan min-height dari CSS yang bekerja
+                element.style.height = (element.scrollHeight) + 'px';
+            }
+
+            function showModal(modal) {
+                modalBackdrop.classList.remove('hidden');
+                modal.classList.remove('hidden');
+                setTimeout(() => {
+                    modalBackdrop.classList.add('opacity-100');
+                    modal.classList.add('opacity-100', 'scale-100');
+                    modal.classList.remove('scale-95', 'opacity-0');
+                }, 10);
+            }
+
+            function hideModals() {
+                // [PERUBAHAN] Menambahkan previewModal ke daftar modal yang disembunyikan
+                [formModal, deleteModal, previewModal].forEach(modal => {
+                    modal.classList.add('opacity-0', 'scale-95');
+                    modal.classList.remove('opacity-100', 'scale-100');
+                });
+                modalBackdrop.classList.add('opacity-0');
+                modalBackdrop.classList.remove('opacity-100');
+                setTimeout(() => {
+                    modalBackdrop.classList.add('hidden');
+                    formModal.classList.add('hidden');
+                    deleteModal.classList.add('hidden');
+                    previewModal.classList.add('hidden'); // Sembunyikan preview modal juga
+                }, 300);
+            }
+
+            function showFormModal(item = null) {
+                const config = tableConfig[currentTable];
+                 if (!config) return;
+                const formFields = config.formFields;
+                 if (!formFields || formFields.length === 0) {
+                    showToast('Konfigurasi form tidak ditemukan.', 'error');
+                    return;
+                 }
+                const primaryKey = config.primaryKey || formFields[0].key;
+
+                dataForm.reset();
+
+                if (item) {
+                    modalIdKeyInput.value = primaryKey;
+                    modalIdValueInput.value = item[primaryKey] !== undefined ? item[primaryKey] : '';
+                    formFields.forEach(field => {
+                        const input = document.getElementById(field.key);
+                        if (input) {
+                             input.value = item[field.key] !== null && item[field.key] !== undefined ? item[field.key] : '';
+
+                            // [PERBAIKAN] Izinkan edit Primary Key HANYA untuk m_izin
+                            if (field.key === primaryKey) {
+                                if (currentTable === 'm_izin') {
+                                    input.readOnly = false; // Boleh diedit untuk m_izin
+                                } else {
+                                    input.readOnly = true; // Tetap terkunci untuk tabel lain
+                                }
+                            }
+                            // --- Baris asli yang diganti ---
+                            // if (field.key === primaryKey) input.readOnly = true;
+                        }
+                    });
+                } else {
+                    modalIdKeyInput.value = primaryKey;
+                    modalIdValueInput.value = '';
+                    const pkInput = document.getElementById(primaryKey);
+                    if (pkInput) pkInput.readOnly = false;
+                }
+
+                currentStep = 1;
+                const steps = [...new Set(formFields.map(f => f.step || 1))];
+                totalSteps = steps.length;
+                updateStepVisibility();
+                // [PERBAIKAN] Panggil autoResizeTextarea setelah modal benar-benar terlihat
+                setTimeout(() => {
+                    formFieldsContainer.querySelectorAll('textarea.auto-resize-textarea').forEach(autoResizeTextarea);
+                }, 50); // Penundaan kecil untuk memastikan render
+                showModal(formModal);
+            }
+
+            function showDeleteModal(id) {
+                confirmDeleteButton.dataset.deleteId = id;
+                showModal(deleteModal);
+            }
+
+            // [BARU] Fungsi untuk menampilkan Modal Preview
+            function showPreviewModal(item) {
+                const config = tableConfig[currentTable];
+                if (!config || !item) return;
+
+                const columns = config.columns || []; // Gunakan kolom tabel jika form tidak ada
+                const fieldsToShow = config.formFields || columns.map(c => ({key: c.key, label: c.label})); // Prioritaskan formFields
+
+                // Ambil Primary Key untuk judul
+                const primaryKey = config.primaryKey || fieldsToShow[0]?.key;
+                const titleValue = primaryKey && item[primaryKey] ? item[primaryKey] : 'Detail';
+                previewModalTitle.textContent = `Detail Data: ${titleValue}`;
+
+                previewModalContent.innerHTML = ''; // Kosongkan konten sebelumnya
+
+                fieldsToShow.forEach(field => {
+                    const dt = document.createElement('dt');
+                    dt.textContent = field.label || field.key; // Tampilkan label jika ada, jika tidak, tampilkan key
+                    previewModalContent.appendChild(dt);
+
+                    const dd = document.createElement('dd');
+                    let value = item[field.key];
+                    dd.textContent = (value !== null && value !== undefined && value !== '') ? value : '-'; // Tampilkan '-' jika kosong
+                    previewModalContent.appendChild(dd);
+                });
+
+                showModal(previewModal);
+            }
+
+
+            function updateStepVisibility() {
+                const config = tableConfig[currentTable];
+                 if (!config || !config.formFields) return;
+                const isWizard = totalSteps > 1;
+
+                formFieldsContainer.querySelectorAll('.step-container').forEach(el => el.classList.remove('active'));
+
+                if (isWizard) {
+                    const currentStepEl = formFieldsContainer.querySelector(`.step-container[data-step="${currentStep}"]`);
+                    if (currentStepEl) currentStepEl.classList.add('active');
+                    let titlePrefix = modalIdValueInput.value ? 'Edit Data' : 'Tambah Data';
+                    modalTitle.textContent = `${titlePrefix} (Langkah ${currentStep} dari ${totalSteps})`;
+                    stepIndicator.textContent = `Langkah ${currentStep} dari ${totalSteps}`;
+                    stepIndicator.classList.remove('hidden');
+                    prevStepButton.classList.toggle('hidden', currentStep === 1);
+                    nextStepButton.classList.toggle('hidden', currentStep === totalSteps);
+                    submitFormButton.classList.toggle('hidden', currentStep !== totalSteps);
+                    cancelFormButton.classList.remove('hidden');
+                } else {
+                    const defaultStepEl = formFieldsContainer.querySelector('.step-container[data-step="1"]');
+                    if (defaultStepEl) defaultStepEl.classList.add('active');
+                    let titlePrefix = modalIdValueInput.value ? 'Edit Data' : 'Tambah Data';
+                    modalTitle.textContent = titlePrefix;
+                    stepIndicator.classList.add('hidden');
+                    prevStepButton.classList.add('hidden');
+                    nextStepButton.classList.add('hidden');
+                    submitFormButton.classList.remove('hidden');
+                    cancelFormButton.classList.remove('hidden');
+                }
+            }
+
+            // --- 7. EVENT LISTENER ---
+
+            navigationLinks.addEventListener('click', (e) => {
+                const navLink = e.target.closest('.nav-link');
+                if (navLink && navLink.dataset.tableId) {
+                    e.preventDefault();
+                    setActiveTable(navLink.dataset.tableId);
+                }
+            });
+
+            searchInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') searchData();
+            });
+
+            tambahButton.addEventListener('click', () => showFormModal());
+
+            umkuKhususButton.addEventListener('click', () => {
+                const newMode = (currentUmkuMode === 'umum') ? 'khusus' : 'umum';
+                setUmkuMode(newMode);
+                showToast(`Mode UMKU ${newMode === 'khusus' ? 'Khusus' : 'Umum'} telah diaktifkan.`, newMode === 'khusus' ? 'success' : 'info');
+            });
+
+            // [PERUBAHAN] Menambahkan event listener untuk tombol tutup modal preview
+            [closeFormModalButton, cancelFormButton, cancelDeleteButton, modalBackdrop, closePreviewModalButton, closePreviewModalFooterButton].forEach(btn => {
+                btn.addEventListener('click', hideModals);
+            });
+
+            formFieldsContainer.addEventListener('input', (e) => {
+                if (e.target.tagName.toLowerCase() === 'textarea' && e.target.classList.contains('auto-resize-textarea')) {
+                    autoResizeTextarea(e.target);
+                }
+            });
+
+            prevStepButton.addEventListener('click', () => { if (currentStep > 1) { currentStep--; updateStepVisibility(); } });
+            nextStepButton.addEventListener('click', () => { if (currentStep < totalSteps) { currentStep++; updateStepVisibility(); } });
+
+            itemsPerPageSelect.addEventListener('change', (e) => {
+                itemsPerPage = parseInt(e.target.value, 10);
+                currentPage = 1;
+                renderTable();
+            });
+
+            prevButton.addEventListener('click', () => { if (currentPage > 1) { currentPage--; renderTable(); } });
+            nextButton.addEventListener('click', () => {
+                const config = tableConfig[currentTable];
+                 if (!config || !tableCache[currentTable]) return; // Periksa config & cache
+                const totalItems = tableCache[currentTable].length;
+                if (currentPage * itemsPerPage < totalItems) { currentPage++; renderTable(); }
+            });
+
+            tableBody.addEventListener('click', (e) => {
+                const editButton = e.target.closest('.edit-btn');
+                const deleteButton = e.target.closest('.delete-btn');
+                const previewButton = e.target.closest('.preview-btn'); // [BARU] Cari tombol preview
+                const config = tableConfig[currentTable];
+                 if (!config) return;
+                const database = tableCache[currentTable];
+                const primaryKey = config.primaryKey || (config.columns && config.columns.length > 0 ? config.columns[0].key : null);
+                if (!primaryKey) return;
+
+                // [BARU] Logika untuk tombol preview
+                if (previewButton && !previewButton.disabled) {
+                    const id = previewButton.dataset.previewId;
+                    if (!id) return;
+                    const itemToPreview = database.find(item => String(item[primaryKey]) === String(id));
+                    if (itemToPreview) showPreviewModal(itemToPreview);
+                }
+
+                if (editButton && !editButton.disabled) { // Cek disabled
+                    const id = editButton.dataset.editId;
+                    if (!id) return;
+                    const itemToEdit = database.find(item => String(item[primaryKey]) === String(id));
+                    if (itemToEdit) showFormModal(itemToEdit);
+                }
+
+                if (deleteButton && !deleteButton.disabled) { // Cek disabled
+                    const id = deleteButton.dataset.deleteId;
+                    if (!id) return;
+                    showDeleteModal(id);
+                }
+            });
+
+            dataForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const isEdit = !!modalIdValueInput.value;
+                const loadingMessage = isEdit ? 'Menyimpan Perubahan...' : 'Menambahkan Data Baru...';
+                showLoading(loadingMessage);
+                const config = tableConfig[currentTable];
+                 if (!config) { hideLoading(); return; }
+                const formFields = config.formFields;
+                 if (!formFields) { hideLoading(); showToast('Konfigurasi form error.', 'error'); return; }
+                const primaryKey = config.primaryKey || formFields[0].key;
+                const idValue = modalIdValueInput.value; // ID lama (jika edit)
+                const formData = new FormData(dataForm);
+                const dataItem = {};
+
+                formFields.forEach(field => {
+                    let value = formData.get(field.key);
+                    if (field.type === 'number') value = value ? parseFloat(value) : (value === '0' ? 0 : null); // Handle '0' dan kosong
+                    dataItem[field.key] = value;
+                });
+                const newId = dataItem[primaryKey]; // ID baru atau lama
+
+                try {
+                    const action = isEdit ? 'update' : 'create';
+                     // Validasi ID baru: tidak boleh null/kosong saat 'create'
+                    if (!isEdit && (newId === null || String(newId).trim() === '')) {
+                         throw new Error(`Primary Key "${primaryKey}" tidak boleh kosong.`);
+                    }
+                    if (!isEdit && tableCache[currentTable].some(item => String(item[primaryKey]) === String(newId))) {
+                         throw new Error(`ID "${newId}" sudah ada.`);
+                    }
+
+                    const response = await fetch(WEB_APP_URL, {
+                        method: 'POST',
+                         // [PERBAIKAN] Header Content-Type dihapus untuk menghindari error pre-flight CORS.
+                         // Google Apps Script akan menerima ini sebagai 'text/plain' dan e.postData.contents akan berfungsi.
+                        body: JSON.stringify({ action, sheet: currentTable, idKey: primaryKey, idValue, data: dataItem })
+                    });
+                     // [DEBUG] Periksa status response POST
+                     console.log(`POST ${action} response status:`, response.status);
+                     if (!response.ok) {
+                         let errorText = await response.text();
+                         console.error(`POST ${action} failed response text:`, errorText);
+                         throw new Error(`Gagal ${action} data (Status: ${response.status}). ${errorText.substring(0, 100)}`);
+                     }
+                    const result = await response.json();
+                     console.log(`POST ${action} result:`, result); // [DEBUG] Log hasil POST
+                    if (!result.success) throw new Error(result.message || `Gagal ${action} data.`);
+
+                    const savedData = result.data;
+                     // Pastikan savedData ada dan memiliki primary key
+                     if (!savedData || savedData[primaryKey] === undefined) {
+                         console.error("Data yang dikembalikan dari server tidak valid:", savedData);
+                         throw new Error("Respons server tidak valid setelah menyimpan.");
+                     }
+
+                    if (isEdit) {
+                        const index = tableCache[currentTable].findIndex(item => String(item[primaryKey]) === String(idValue));
+                        if (index !== -1) tableCache[currentTable][index] = savedData;
+                    } else {
+                        tableCache[currentTable].unshift(savedData);
+                         currentPage = 1;
+                    }
+
+                    hideModals();
+                    renderTable();
+
+                    setTimeout(() => {
+                        // Pastikan savedData[primaryKey] ada sebelum membuat ID baris
+                         const savedId = savedData[primaryKey];
+                         if (savedId !== null && savedId !== undefined) {
+                            const rowId = `row-${currentTable}-${savedId}`;
+                            const rowElement = document.getElementById(rowId);
+                            if (rowElement) {
+                                const highlightClass = isEdit ? 'highlight-edit' : 'highlight-new';
+                                rowElement.classList.remove('highlight-edit', 'highlight-new');
+                                void rowElement.offsetWidth;
+                                rowElement.classList.add(highlightClass);
+                                setTimeout(() => rowElement.classList.remove(highlightClass), 3000);
+                            } else {
+                                console.warn(`Elemen baris dengan ID ${rowId} tidak ditemukan untuk di-highlight.`);
+                            }
+                         } else {
+                             console.warn("savedData tidak memiliki primary key yang valid untuk highlight.");
+                         }
+                     }, 150);
+
+
+                } catch (error) {
+                    console.error('Gagal menyimpan data:', error);
+                    showToast('Gagal menyimpan: ' + error.message, 'error');
+                } finally {
+                    hideLoading();
+                }
+            });
+
+            confirmDeleteButton.addEventListener('click', async () => {
+                const id = confirmDeleteButton.dataset.deleteId;
+                if (!id) return;
+                const config = tableConfig[currentTable];
+                 if (!config) return;
+                const primaryKey = config.primaryKey || (config.columns && config.columns.length > 0 ? config.columns[0].key : null);
+                if (!primaryKey) { showToast('Primary key error.', 'error'); return; }
+
+                showLoading('Menghapus Data...');
+                try {
+                    const response = await fetch(WEB_APP_URL, {
+                        method: 'POST',
+                         // [PERBAIKAN] Header Content-Type dihapus untuk menghindari error pre-flight CORS.
+                        body: JSON.stringify({ action: 'delete', sheet: currentTable, idKey: primaryKey, idValue: id })
+                    });
+                     // [DEBUG] Periksa status response DELETE
+                     console.log("POST delete response status:", response.status);
+                     if (!response.ok) {
+                         let errorText = await response.text();
+                         console.error("POST delete failed response text:", errorText);
+                         throw new Error(`Gagal menghapus data (Status: ${response.status}). ${errorText.substring(0, 100)}`);
+                     }
+                    const result = await response.json();
+                     console.log("POST delete result:", result); // [DEBUG] Log hasil DELETE
+                    if (!result.success) throw new Error(result.message || 'Gagal menghapus.');
+
+                    // Filter cache frontend menggunakan id asli dari tombol
+                    tableCache[currentTable] = tableCache[currentTable].filter(item => String(item[primaryKey]) !== String(id));
+                    hideModals();
+                    renderTable();
+                     showToast('Data berhasil dihapus (ditandai).', 'success');
+
+                } catch (error) {
+                    console.error('Gagal menghapus data:', error); // Typo diperbaiki
+                    showToast('Gagal menghapus: ' + error.message, 'error');
+                } finally {
+                    hideLoading();
+                }
+            });
+
+            // --- INISIALISASI APLIKASI ---
+            setUmkuMode('umum');
+            setActiveTable(currentTable);
+
+        });
+    </script>
+
+</body>
+</html>
+
